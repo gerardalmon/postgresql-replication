@@ -8,8 +8,13 @@ PGSQL_DATA="/var/lib/pgsql/data/"
 if [ "${1}" == "master" ]; then
     #set up master
     PGPASSWORD=${DB_PASSWORD} psql -Uwebadmin postgres -c "CREATE USER replication REPLICATION LOGIN CONNECTION LIMIT -1 ENCRYPTED PASSWORD '${DB_PASSWORD}';";
+    PGPASSWORD=${DB_PASSWORD} psql -Uwebadmin postgres -c "CREATE USER zbx_monitor WITH PASSWORD 'zabbix' INHERIT;";
+    PGPASSWORD=${DB_PASSWORD} psql -Uwebadmin postgres -c "GRANT pg_monitor TO zbx_monitor;";
     sudo /etc/init.d/postgresql stop
     sed -i "1i host replication  replication       ${SLAVE_IP}/32    trust" ${PGSQL_DATA}pg_hba.conf;
+    sed -i "2i host all zbx_monitor 127.0.0.1/32 trust" ${PGSQL_DATA}pg_hba.conf;
+    sed -i "3i host all zbx_monitor 0.0.0.0/0 md5" ${PGSQL_DATA}pg_hba.conf;
+    sed -i "4i host all zbx_monitor ::0/0 md5" ${PGSQL_DATA}pg_hba.conf;
     sed -i "s|.*wal_level.*|wal_level = hot_standby|g" ${PGSQL_DATA}postgresql.conf;
     sed -i "s|.*max_wal_senders.*|max_wal_senders = 8|g" ${PGSQL_DATA}postgresql.conf;
     sed -i "s|.*wal_keep_segments.*|wal_keep_segments = 32|g" ${PGSQL_DATA}postgresql.conf;
@@ -24,6 +29,9 @@ if [ "${1}" == "slave" ]; then
     rm -rf ${PGSQL_DATA};
     PGPASSWORD=${DB_PASSWORD} pg_basebackup -h ${MASTER_IP} -D ${PGSQL_DATA} -U replication -v -P;
     sed -i "1i host replication  replication       ${MASTER_IP}/32    trust" ${PGSQL_DATA}pg_hba.conf;
+    sed -i "2i host all zbx_monitor 127.0.0.1/32 trust" ${PGSQL_DATA}pg_hba.conf;
+    sed -i "3i host all zbx_monitor 0.0.0.0/0 md5" ${PGSQL_DATA}pg_hba.conf;
+    sed -i "4i host all zbx_monitor ::0/0 md5" ${PGSQL_DATA}pg_hba.conf;
     sed -i "s|.*hot_standby.*|hot_standby = on|g" ${PGSQL_DATA}postgresql.conf;
     sed -i "153 a wal_level = hot_standby" ${PGSQL_DATA}postgresql.conf;
     sed -i "s|.*max_wal_senders.*|max_wal_senders = 1|g" ${PGSQL_DATA}postgresql.conf;
